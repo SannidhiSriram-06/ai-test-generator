@@ -51,18 +51,12 @@ pipeline {
                 sh '''
                     IMAGE_TAG="${BUILD_NUMBER}-$(git rev-parse --short HEAD)"
                     echo "Building image: $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG"
-
                     aws ecr get-login-password --region $AWS_REGION | \
                         docker login --username AWS --password-stdin $ECR_REGISTRY
-
                     docker build -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG .
                     docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
-
-                    # Also tag as latest
                     docker tag $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPO:latest
                     docker push $ECR_REGISTRY/$ECR_REPO:latest
-
-                    # Save tag for next stage
                     echo $IMAGE_TAG > image_tag.txt
                 '''
             }
@@ -72,13 +66,9 @@ pipeline {
             steps {
                 sh '''
                     IMAGE_TAG=$(cat image_tag.txt)
-
                     git clone https://$GITHUB_TOKEN@$GITOPS_REPO gitops-repo
                     cd gitops-repo
-
-                    # Update the tag in values.yaml
                     sed -i "s|tag: .*|tag: \"$IMAGE_TAG\"|" $VALUES_FILE
-
                     git config user.email "jenkins@ci"
                     git config user.name "Jenkins"
                     git add $VALUES_FILE
@@ -97,7 +87,7 @@ pipeline {
             echo "Pipeline failed. Check console output above."
         }
         always {
-            sh 'rm -rf venv gitops-repo image_tag.txt || true'
+            cleanWs()
         }
     }
 }
