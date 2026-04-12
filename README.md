@@ -1,176 +1,204 @@
 # AI Test Generator
 
-> FastAPI service that uses Groq LLM to automatically generate pytest test cases from Python source code, deployed via a full GitOps CI/CD pipeline.
+> A FastAPI-based microservice that generates executable pytest test suites from Python code using LLM inference, deployed via a fully automated GitOps CI/CD pipeline.
 
 ---
 
-## Architecture
+## 🧠 Overview
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Developer Laptop                          │
-│                                                                  │
-│   git push                                                       │
-│      │                                                           │
-│      ▼                                                           │
-│  ┌──────────┐    poll    ┌──────────────────────────────┐       │
-│  │  GitHub   │ ─────────▶│       Jenkins Pipeline        │       │
-│  │ (app repo)│           │                              │       │
-│  └──────────┘           │  1. pytest (≥70% cov gate)   │       │
-│                          │  2. docker build             │       │
-│                          │  3. docker push → ECR        │       │
-│                          │  4. update values.yaml       │       │
-│                          └──────────────┬───────────────┘       │
-│                                         │ git push               │
-│                                         ▼                        │
-│                          ┌──────────────────────────────┐       │
-│                          │   GitHub (gitops repo)        │       │
-│                          │   charts/ai-test-generator/   │       │
-│                          │   values.yaml  ← image tag    │       │
-│                          └──────────────┬───────────────┘       │
-│                                         │ auto-sync              │
-│                                         ▼                        │
-│                          ┌──────────────────────────────┐       │
-│                          │          ArgoCD               │       │
-│                          │  (watches gitops repo)        │       │
-│                          └──────────────┬───────────────┘       │
-│                                         │ helm upgrade           │
-│                                         ▼                        │
-│                          ┌──────────────────────────────┐       │
-│                          │      Minikube Cluster         │       │
-│                          │  ┌────────────────────────┐  │       │
-│                          │  │    Helm Release         │  │       │
-│                          │  │   ai-test-generator     │  │       │
-│                          │  │   FastAPI pod (ECR img) │  │       │
-│                          │  └────────────────────────┘  │       │
-│                          └──────────────────────────────┘       │
-└─────────────────────────────────────────────────────────────────┘
-```
+This system automates test generation by converting raw Python functions into structured pytest suites using a large language model. The service is designed with a production-style delivery pipeline, including automated testing, containerization, and GitOps-based deployment.
+
+**Core capabilities:**
+
+* LLM-driven test generation from source code
+* API-based interaction with validation and rate limiting
+* Automated CI/CD with coverage enforcement
+* GitOps-driven deployment to a Kubernetes environment
 
 ---
 
-## Tech Stack
+## 🏗️ Architecture
 
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
-![Python](https://img.shields.io/badge/Python_3.11-3776AB?style=flat&logo=python&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)
-![Jenkins](https://img.shields.io/badge/Jenkins-D24939?style=flat&logo=jenkins&logoColor=white)
-![ArgoCD](https://img.shields.io/badge/ArgoCD-EF7B4D?style=flat&logo=argo&logoColor=white)
-![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=flat&logo=kubernetes&logoColor=white)
-![Helm](https://img.shields.io/badge/Helm-0F1689?style=flat&logo=helm&logoColor=white)
-![AWS ECR](https://img.shields.io/badge/AWS_ECR-FF9900?style=flat&logo=amazon-aws&logoColor=white)
-![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=flat&logo=terraform&logoColor=white)
-![Groq](https://img.shields.io/badge/Groq_LLM-F55036?style=flat&logoColor=white)
+**Flow:**
 
----
+Developer Push → CI Pipeline → Container Registry → GitOps Repo → ArgoCD → Kubernetes Cluster
 
-## How it works
+**Key Components:**
 
-Send a Python function to the `/generate` endpoint and the service forwards it to Groq's `llama-3.1-8b-instant` model with a structured prompt instructing it to return a complete pytest test suite. The API enforces a rate limit of 5 requests per minute via `slowapi` and validates that input code is non-empty and under the size limit before hitting the LLM. Every push to `main` triggers a Jenkins pipeline that runs pytest with a 70% coverage gate, builds a new Docker image tagged `BUILD_NUMBER-COMMIT_SHA`, pushes it to AWS ECR, and updates the image tag in the GitOps repository — which ArgoCD detects and uses to roll out a new pod on Minikube automatically.
+* FastAPI microservice (test generation engine)
+* Jenkins CI pipeline (build, test, security gates)
+* AWS ECR (container registry)
+* GitOps repository (deployment state)
+* ArgoCD (continuous delivery)
+* Kubernetes (Minikube) runtime
 
 ---
 
-## Folder structure
+## ⚙️ Tech Stack
 
-```
+| Layer            | Technology                  |
+| ---------------- | --------------------------- |
+| Backend          | FastAPI (Python 3.11)       |
+| AI/LLM           | Groq API (LLaMA 3.1)        |
+| CI/CD            | Jenkins                     |
+| Containerization | Docker                      |
+| Orchestration    | Kubernetes (Minikube), Helm |
+| GitOps           | ArgoCD                      |
+| Registry         | AWS ECR                     |
+| IaC              | Terraform                   |
+
+---
+
+## 🚀 Functionality
+
+1. Client sends Python code to `/generate` endpoint
+2. Service validates input (size, format, rate limits)
+3. Code is passed to Groq LLM with structured prompt
+4. LLM returns a complete pytest test suite
+5. Response is returned as executable test code
+
+**Additional controls:**
+
+* Rate limiting: 5 requests/minute (`slowapi`)
+* Input validation for robustness
+* Health endpoint for monitoring
+
+---
+
+## 🧩 System Behavior
+
+* Test generation is deterministic at API level (validated inputs, structured prompts)
+* CI enforces a **minimum 70% coverage gate** before deployment
+* Each build produces a uniquely tagged container image
+* Deployment is fully automated via GitOps synchronization
+
+---
+
+## 📁 Project Structure
+
+```id="s4yr3m"
 ai-test-generator/
 ├── app/
-│   ├── __init__.py
-│   ├── config.py          # env var loading via python-dotenv
-│   └── main.py            # FastAPI app, /health and /generate endpoints
 ├── tests/
-│   ├── __init__.py
-│   └── test_main.py       # 5 async pytest tests, 87% coverage
-├── Terraform/
-│   └── main.tf            # ECR repo provisioning (ap-south-1)
-├── Dockerfile             # multi-stage build, python:3.11-slim
-├── Jenkinsfile            # CI pipeline (pytest → ECR → gitops update)
-├── pytest.ini             # asyncio_mode = auto
+├── terraform/
+├── Dockerfile
+├── Jenkinsfile
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
-## Local setup
+## 💻 Local Setup
 
 ### Prerequisites
 
-- Python 3.11+
-- Docker Desktop
-- A [Groq API key](https://console.groq.com/)
+* Python 3.11+
+* Docker
+* Groq API key
 
 ### Steps
 
 ```bash
-# 1. Clone the repo
 git clone https://github.com/SannidhiSriram-06/ai-test-generator.git
 cd ai-test-generator
 
-# 2. Create a virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# 3. Install dependencies
 pip install -r requirements.txt
-
-# 4. Set up environment variables
 echo "GROQ_API_KEY=your_key_here" > .env
 
-# 5. Start the server
 uvicorn app.main:app --reload --port 8000
 ```
 
-The API is now running at `http://localhost:8000`.
-
-### Usage
-
-```bash
-# Health check
-curl http://localhost:8000/health
-
-# Generate tests
-curl -X POST http://localhost:8000/generate \
-  -H "Content-Type: application/json" \
-  -d '{"code": "def add(a, b):\n    return a + b"}'
-```
+API runs at: `http://localhost:8000`
 
 ---
 
-## Running tests
+## 🔬 Testing
 
 ```bash
-# Run tests with coverage report
-pytest tests/ --cov=app --cov-report=term-missing -v
-
-# Run with the same coverage gate used in CI
 pytest tests/ --cov=app --cov-fail-under=70 -v
 ```
 
-Expected output: **5 passed, 87% coverage**.
+* Coverage threshold enforced both locally and in CI
+* Ensures deployment only occurs for validated builds
 
 ---
 
-## CI/CD flow
+## 🔄 CI/CD Pipeline
 
-Every push to `main` triggers the Jenkins pipeline defined in `Jenkinsfile`:
+Triggered on every push to `main`.
 
-| Stage | What happens |
-|---|---|
-| **Checkout** | Jenkins pulls the latest commit from GitHub |
-| **Install dependencies** | `pip install` into a virtualenv |
-| **Run tests** | `pytest` with `--cov-fail-under=70` — build fails if coverage drops below threshold |
-| **Build & push to ECR** | Docker image built, tagged `BUILD_NUMBER-COMMIT_SHA`, pushed to AWS ECR (`ap-south-1`) |
-| **Update GitOps repo** | Jenkins clones `ai-test-generator-gitops`, updates `image.tag` in `values.yaml`, and pushes |
-| **ArgoCD sync** | ArgoCD detects the `values.yaml` change and rolls out the new image to Minikube automatically |
+**Pipeline stages:**
 
-Secrets (AWS credentials, Groq API key, GitHub PAT) are stored in the Jenkins credential store — never in code.
+1. Checkout code
+2. Install dependencies
+3. Run tests with coverage gate
+4. Build Docker image
+5. Push image to AWS ECR
+6. Update GitOps repository (`values.yaml`)
+7. ArgoCD sync triggers deployment
+
+**Key characteristics:**
+
+* Fail-fast on test or coverage failure
+* Immutable image tagging (`BUILD_NUMBER-COMMIT_SHA`)
+* Separation of application and deployment state
 
 ---
 
-## Screenshots
+## ☁️ Deployment Model
 
-> See `project-screenshots.pdf` in this repository for full pipeline screenshots including Jenkins build view, ArgoCD sync status, and kubectl pod output.
+* Application containerized and deployed on Kubernetes (Minikube)
+* Helm manages release configuration
+* ArgoCD continuously reconciles desired state from GitOps repo
+
+A complete deployment workflow is implemented and documented within the repository, enabling reproducible setup of the full pipeline.
+
+> The system was deployed and validated as part of project execution.
+> Infrastructure resources were decommissioned after validation to optimize cost usage.
+> All configuration and deployment steps are preserved for reproducibility.
+
+---
+
+## 🔐 Security Considerations
+
+* No credentials stored in source code
+* Secrets managed via Jenkins credential store
+* Input validation before LLM invocation
+* CI-integrated safeguards (coverage gate)
+
+---
+
+## 🎯 Objectives
+
+This project demonstrates:
+
+* Practical use of LLMs in developer tooling
+* Designing API-driven AI microservices
+* Implementing CI/CD with enforced quality gates
+* Applying GitOps principles for deployment automation
+* Managing containerized workloads in Kubernetes
+
+---
+
+## 🏁 Outcome
+
+A fully automated system that:
+
+* Generates test cases from code using LLM inference
+* Enforces quality through CI pipelines
+* Deploys continuously using GitOps principles
+
+This project represents a production-style implementation of an **AI-assisted developer tooling system with automated delivery pipelines**.
+
+---
+
+## 📌 Notes
+
+The deployment pipeline and infrastructure were actively used during development and validation. Resources were later decommissioned to optimize cost usage, while preserving full reproducibility through configuration and documentation.
 
 ---
 
