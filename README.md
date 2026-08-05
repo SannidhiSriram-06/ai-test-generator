@@ -1,6 +1,6 @@
 # AI Test Generator
 
-> A DevOps/Cloud engineering project: a containerized FastAPI microservice with a full CI/CD → GitOps → Kubernetes delivery pipeline. The service itself happens to call an LLM to generate pytest suites, but the point of the project is the pipeline around it — automated testing, coverage gating, immutable image builds, and GitOps-driven deployment.
+> A DevOps/Cloud engineering project: a containerized FastAPI microservice with CI, a GitOps chart repository, and Kubernetes deployment configuration. The service calls an LLM to generate pytest suites; the main focus is the delivery workflow around it — automated testing, a coverage gate, versioned image tags, and GitOps-oriented deployment.
 
 ---
 
@@ -15,7 +15,7 @@ Developer Push → Jenkins CI (test + coverage gate) → AWS ECR → GitOps repo
 * Jenkins CI pipeline (build, test, coverage gate, image push)
 * AWS ECR (container registry)
 * Terraform (ECR provisioning, IaC)
-* [ai-test-generator-gitops](https://github.com/SannidhiSriram-06/ai-pytest-generator-gitops) — deployment-state repo (Helm chart)
+* [ai-pytest-generator-gitops](https://github.com/SannidhiSriram-06/ai-pytest-generator-gitops) — deployment-state repo (Helm chart)
 * ArgoCD (continuous delivery / GitOps reconciliation)
 * Kubernetes (Minikube), Helm
 * FastAPI microservice (the application being deployed)
@@ -39,7 +39,7 @@ Developer Push → Jenkins CI (test + coverage gate) → AWS ECR → GitOps repo
 
 ## 🔄 CI/CD Pipeline
 
-Triggered on every push to `main` (see `Jenkinsfile`).
+The `Jenkinsfile` defines the following pipeline stages. Repository triggers (for example, a GitHub webhook) are configured outside this repository.
 
 | Stage | What happens |
 |---|---|
@@ -47,22 +47,21 @@ Triggered on every push to `main` (see `Jenkinsfile`).
 | **Install dependencies** | `pip install` into a virtualenv |
 | **Run tests** | `pytest --cov=app --cov-fail-under=70` — build fails if coverage drops below 70% |
 | **Build & push to ECR** | Docker image built, tagged `BUILD_NUMBER-COMMIT_SHA`, pushed to AWS ECR (`ap-south-1`) |
-| **Update GitOps repo** | Jenkins clones `ai-pytest-generator-gitops`, updates `image.tag` in `charts/ai-test-generator/values.yaml`, commits, pushes |
-| **ArgoCD sync** | ArgoCD detects the `values.yaml` change and rolls out the new image on Minikube automatically |
+| **Update GitOps repo** | Jenkins attempts to clone `ai-test-generator-gitops`, updates `image.tag` in `charts/ai-test-generator/values.yaml`, commits, pushes. This URL currently differs from the companion repository's configured origin (`ai-pytest-generator-gitops`). |
+| **GitOps reconciliation** | An externally configured Argo CD application can detect the `values.yaml` change and sync the rendered manifests to its target cluster |
 
-Secrets (AWS credentials, Groq API key, GitHub PAT) are stored in the Jenkins credential store — never in code.
+The pipeline references Jenkins credential IDs for AWS credentials, the Groq API key, and a GitHub token. The repository configuration contains no secret values; keep deployment screenshots and other artifacts free of credentials as well.
 
 ---
 
 ## ☁️ Deployment Model
 
 * Application containerized (`Dockerfile`, non-root user, multi-stage build) and deployed on Kubernetes (Minikube)
-* Helm manages release configuration via the companion GitOps repo
-* ArgoCD continuously reconciles cluster state from the GitOps repo — no manual `kubectl apply`
+* Helm chart configuration lives in the companion GitOps repo
+* Argo CD reconciliation and the target-cluster setup are external to these repositories
 * ECR repository and lifecycle policy (keep last 10 images, scan-on-push) provisioned via Terraform (`Terraform/main.tf`)
 
-> The system was deployed and validated end-to-end (Jenkins → ECR → ArgoCD → Minikube) as part of project execution.
-> Infrastructure resources were decommissioned afterward to optimize cost usage. All configuration is preserved for reproducibility.
+The ECR repository is configured as **mutable** and the pipeline also pushes `latest`; the build-specific `BUILD_NUMBER-COMMIT_SHA` tag is the tag written to the GitOps values file.
 
 ---
 
@@ -73,7 +72,7 @@ A FastAPI microservice that generates pytest test suites from Python source code
 **Endpoints:**
 
 * `POST /generate` — accepts `{"code": "..."}`, validates input (non-empty, ≤2000 chars), rate-limited to 5 requests/minute (`slowapi`), sends the code to Groq's `llama-3.1-8b-instant` model with a structured prompt, returns a generated pytest file
-* `GET /health` — liveness/health check
+* `GET /health` — application health endpoint
 * `GET /metrics` — in-memory request/error counters
 
 ---
@@ -84,7 +83,7 @@ A FastAPI microservice that generates pytest test suites from Python source code
 ai-test-generator/
 ├── app/
 │   ├── __init__.py
-│   ├── config.py          # env var loading
+│   ├── config.py          # reserved module (currently empty)
 │   └── main.py            # FastAPI app: /health, /metrics, /generate
 ├── tests/
 │   └── test_main.py       # async pytest tests (httpx + mocked Groq client)
@@ -142,14 +141,14 @@ curl -X POST http://localhost:8000/generate \
 pytest tests/ --cov=app --cov-fail-under=70 -v
 ```
 
-Coverage threshold (70%) is enforced both locally and in CI — deployment only happens for builds that pass it.
+The Jenkins test stage enforces the 70% threshold before image build and GitOps-update stages. Run the command locally after installing the development dependencies.
 
 ---
 
 ## 🔐 Security Considerations
 
-* No credentials stored in source code
-* Secrets managed via Jenkins credential store
+* The text configuration references Jenkins credential IDs rather than secret values
+* The Kubernetes chart expects pre-existing `ecr-secret` and `ai-test-generator-secret` secrets
 * Non-root container user
 * Input validation before LLM invocation
 * CI-integrated coverage gate as a quality safeguard
@@ -163,7 +162,7 @@ This project demonstrates:
 * CI/CD pipeline design with enforced quality gates (Jenkins)
 * GitOps deployment automation (ArgoCD + Helm)
 * Infrastructure as Code (Terraform)
-* Container image lifecycle management (ECR, immutable tagging)
+* Container image lifecycle management (ECR lifecycle policy and versioned build tags)
 * Running containerized workloads on Kubernetes
 * Integrating a third-party LLM API behind a rate-limited FastAPI service
 
@@ -171,10 +170,10 @@ This project demonstrates:
 
 ## 📌 Notes
 
-See `Deployment-Screenshots.pdf` in this repository for the Jenkins build, ArgoCD sync status, and kubectl pod output captured during validation.
+`Deployment-Screenshots.pdf` contains historical validation screenshots. Review and redact any sensitive values before sharing it.
 
 ---
 
 ## License
 
-MIT
+No license file is currently included in this repository.
