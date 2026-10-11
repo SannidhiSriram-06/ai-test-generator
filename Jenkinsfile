@@ -9,7 +9,7 @@ pipeline {
         AWS_REGION            = 'ap-south-1'
         ECR_REGISTRY          = '940031346109.dkr.ecr.ap-south-1.amazonaws.com'
         ECR_REPO              = 'ai-test-generator'
-        GITOPS_REPO           = 'github.com/SannidhiSriram-06/ai-test-generator-gitops.git'
+        GITOPS_REPO           = 'github.com/SannidhiSriram-06/ai-pytest-generator-gitops.git'
         VALUES_FILE           = 'charts/ai-test-generator/values.yaml'
     }
 
