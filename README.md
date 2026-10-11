@@ -47,7 +47,7 @@ The `Jenkinsfile` defines the following pipeline stages. Repository triggers (fo
 | **Install dependencies** | `pip install` into a virtualenv |
 | **Run tests** | `pytest --cov=app --cov-fail-under=70` — build fails if coverage drops below 70% |
 | **Build & push to ECR** | Docker image built, tagged `BUILD_NUMBER-COMMIT_SHA`, pushed to AWS ECR (`ap-south-1`) |
-| **Update GitOps repo** | Jenkins attempts to clone `ai-test-generator-gitops`, updates `image.tag` in `charts/ai-test-generator/values.yaml`, commits, pushes. This URL currently differs from the companion repository's configured origin (`ai-pytest-generator-gitops`). |
+| **Update GitOps repo** | Jenkins attempts to clone `ai-test-generator-gitops`, updates `image.tag` in `charts/ai-test-generator/values.yaml`, commits, pushes. The companion repository is now named `ai-pytest-generator-gitops`; the old name in the `Jenkinsfile` still works only because GitHub redirects renamed repositories. |
 | **GitOps reconciliation** | An externally configured Argo CD application can detect the `values.yaml` change and sync the rendered manifests to its target cluster |
 
 The pipeline references Jenkins credential IDs for AWS credentials, the Groq API key, and a GitHub token. The repository configuration contains no secret values; keep deployment screenshots and other artifacts free of credentials as well.
